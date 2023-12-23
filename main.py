@@ -5,7 +5,7 @@ class DomainName(str):
     def __getattr__(self, item):
         return DomainName(item + "." + self)
 
-DOMAINS = [
+ZONES = [
     {
         "name": "example.com.",
         "ip": "192.168.0.100",
@@ -13,12 +13,12 @@ DOMAINS = [
     }
 ]
 
-for domain in DOMAINS:
-    domain["name"] = DomainName(domain["name"])
+for zone in ZONES:
+    zone["name"] = DomainName(zone["name"])
     
-    domain["soa_record"] = dnslib.SOA(
-        mname=domain["name"].ns1,
-        rname=domain["name"].andrei,
+    zone["soa_record"] = dnslib.SOA(
+        mname=zone["name"].ns1,
+        rname=zone["name"].andrei,
         times=(
             201307231,
             60 * 60 * 1,
@@ -28,17 +28,17 @@ for domain in DOMAINS:
         )
     )
     
-    domain["ns_records"] = [
-        dnslib.NS(domain["name"].ns1),
-        dnslib.NS(domain["name"].ns2)
+    zone["ns_records"] = [
+        dnslib.NS(zone["name"].ns1),
+        dnslib.NS(zone["name"].ns2)
     ]
         
-    domain["records"] = {
-        domain["name"]: [dnslib.A(domain["ip"]), dnslib.AAAA((0,) * 16), dnslib.MX(domain["name"].mail), domain["soa_record"]] + domain["ns_records"],
-        domain["name"].ns1: [dnslib.A(domain["ip"])],
-        domain["name"].ns2: [dnslib.A(domain["ip"])],
-        domain["name"].mail: [dnslib.A(domain["ip"])],
-        domain["name"].andrei: [dnslib.CNAME(domain["name"])],
+    zone["records"] = {
+        zone["name"]: [dnslib.A(zone["ip"]), dnslib.AAAA((0,) * 16), dnslib.MX(zone["name"].mail), zone["soa_record"]] + zone["ns_records"],
+        zone["name"].ns1: [dnslib.A(zone["ip"])],
+        zone["name"].ns2: [dnslib.A(zone["ip"])],
+        zone["name"].mail: [dnslib.A(zone["ip"])],
+        zone["name"].andrei: [dnslib.CNAME(zone["name"])],
     }
 
 def dns_response(data):
@@ -61,29 +61,29 @@ def dns_response(data):
     qtype = request.q.qtype
     qt = QTYPE[qtype]
 
-    for domain in DOMAINS:
-        if qn == domain["name"] or qn.endswith("." + domain["name"]):
-            for name, rrs in domain["records"].items():
+    for zone in ZONES:
+        if qn == zone["name"] or qn.endswith("." + zone["name"]):
+            for name, rrs in zone["records"].items():
                 if name == qn:
                     for rdata in rrs:
                         rqt = rdata.__class__.__name__
                         if qt in ["*", rqt]:
                             reply.add_answer(
                                 dnslib.RR(
-                                    rname=qname, rtype=getattr(QTYPE, rqt), rclass=1, ttl=domain["ttl"], rdata=rdata
+                                    rname=qname, rtype=getattr(QTYPE, rqt), rclass=1, ttl=zone["ttl"], rdata=rdata
                                 )
                             )
 
-            for rdata in domain["ns_records"]:
+            for rdata in zone["ns_records"]:
                 reply.add_ar(
                     dnslib.RR(
-                        rname=domain["name"], rtype=QTYPE.NS, rclass=1, ttl=domain["ttl"], rdata=rdata
+                        rname=zone["name"], rtype=QTYPE.NS, rclass=1, ttl=zone["ttl"], rdata=rdata
                     )
                 )
 
             reply.add_auth(
                 dnslib.RR(
-                    rname=domain["name"], rtype=QTYPE.SOA, rclass=1, ttl=domain["ttl"], rdata=domain["soa_record"]
+                    rname=zone["name"], rtype=QTYPE.SOA, rclass=1, ttl=zone["ttl"], rdata=zone["soa_record"]
                 )
             )
 
