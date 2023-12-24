@@ -1,4 +1,4 @@
-import argparse, datetime, sys, time, threading, traceback, socketserver, struct, dnslib
+import argparse, sys, time, threading, socketserver, dnslib
 from dnslib import QTYPE
 
 class DomainName(str):
@@ -99,19 +99,19 @@ class BaseRequestHandler(socketserver.BaseRequestHandler):
         raise NotImplementedError
 
     def handle(self):
-        now = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S.%f")
+        now = time.strftime("%Y-%m-%d %H:%M:%S.%f", time.gmtime())
         print(f"\n\n{self.__class__.__name__[:3]} request {now} ({self.client_address[0]} {self.client_address[1]}):")
         try:
             data = self.get_data()
             print(len(data), data)
             self.send_data(dns_response(data))
-        except Exception:
-            traceback.print_exc(file=sys.stderr)
+        except Exception as exception:
+            print(f"[!] Error handling request: {exception}", file=sys.stderr)
 
 class TCPRequestHandler(BaseRequestHandler):
     def get_data(self):
         data = self.request.recv(8192).strip()
-        sz = struct.unpack(">H", data[:2])[0]
+        sz = int.from_bytes(data[:2], byteorder="big")
         if sz < len(data) - 2:
             raise Exception("Wrong size of TCP packet")
         elif sz > len(data) - 2:
@@ -119,7 +119,7 @@ class TCPRequestHandler(BaseRequestHandler):
         return data[2:]
 
     def send_data(self, data):
-        sz = struct.pack(">H", len(data))
+        sz = len(data).to_bytes(2, byteorder="big")
         return self.request.sendall(sz + data)
 
 class UDPRequestHandler(BaseRequestHandler):
